@@ -1,0 +1,12 @@
+{
+  "name": "字形 — 汉字地区字形对照",
+  "short_name": "字形",
+  "description": "输入一个汉字，立即比较不同地区的实际字形。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f4f0",
+  "theme_color": "#174b3e",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
