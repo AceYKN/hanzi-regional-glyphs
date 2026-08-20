@@ -1,21 +1,18 @@
 # 字形 · HanGlyph
 
-输入一个汉字，立即比较它在中国大陆、台湾、香港、日本、新加坡和马来西亚环境下的实际字形。
+输入一个汉字，立即比较它在中国大陆、台湾、香港、日本、新加坡和马来西亚的地区写法与实际字形。
 
-## 当前版本
+## 功能
 
-这是依照《汉字地区字形展示网站——软件设计说明书 v1.0》实现的前端 MVP：
+- 地区用字转换：`见 → 見`、`東 → 东`、`國 → 国`、`龍 → 竜`
+- 六地区卡片；新加坡和马来西亚明确复用大陆简体配置
+- 对应地区的 Noto / Source Han 黑体和宋体渲染
+- 覆盖 CJK 基本区的静态拼音反查索引，支持无声调、声调符号及数字声调输入
+- 单字、词语、文本、Unicode 和日语读音查询
+- 全屏查看、任意两地区叠加、64–256 px 字号控制
+- 响应式布局、深浅色主题、PWA、离线缓存和安全响应头
 
-- 六地区字形卡片；SG / MY 明确复用 CN 字形配置
-- 黑体 / 宋体切换与 64–256 px 字号控制
-- 单字、词语、文本、Unicode、`gu` 与 `ほね` 查询示例
-- 逐字选择、简繁多对多映射、普通话和日语读音
-- 点击全屏查看、任意两地区 DOM 叠加比较
-- 响应式横向滑动、键盘操作、深浅色主题与本地偏好
-- Canonical 字符 URL、SEO metadata、PWA 与离线运行时缓存
-- 安全响应头与不收集个人数据的静态架构
-
-内置字符记录是一组可验证的 MVP 示例数据；`CharacterRecord` 与 UI 已按 Unihan 字段结构解耦，后续可接入完整的分片数据生成管线。
+地区写法转换与字体字形是两个连续步骤：先用 OpenCC 得到各地区现代常用字符，再使用对应地区字体配置渲染。
 
 ## 本地开发
 
@@ -26,21 +23,20 @@ npm install
 npm run dev
 ```
 
-生产构建与测试：
+验证生产版本：
 
 ```bash
 npm run build
+npm run lint
 npm test
 ```
 
-## 部署
+`npm run data:build` 会使用 pinyin-pro 重新生成 `public/index/pinyin.json`。
 
-项目输出为 Cloudflare Worker 兼容的静态前端，可通过 Cloudflare Pages / Sites 发布。仓库包含 `_headers`、`_redirects`、PWA manifest 和 Service Worker。
+## Cloudflare Pages
 
-## 字体与数据
+这是纯 React + TypeScript + Vite 静态站点，生产输出目录为 `dist`。仓库包含 `_headers`、`_redirects`、PWA manifest 和 Service Worker，可直接部署到 Cloudflare Pages。
 
-界面使用 Google Fonts 提供的 Noto Sans/Serif CJK 地区字体，它们是 Adobe Source Han 系列的发行版本。字符数据模型参考 Unicode Unihan。应用源码、字体和 Unicode 数据的许可彼此独立，详见 [THIRD_PARTY_LICENSES.md](./THIRD_PARTY_LICENSES.md)。
+## 资料与许可
 
-## License
-
-应用源码采用 [MIT License](./LICENSE)。
+地区转换使用 OpenCC，拼音索引使用 pinyin-pro，字形使用 Google Fonts 提供的 Noto Sans/Serif CJK 地区字体。应用源码采用 [MIT License](./LICENSE)，第三方许可见 [THIRD_PARTY_LICENSES.md](./THIRD_PARTY_LICENSES.md)。

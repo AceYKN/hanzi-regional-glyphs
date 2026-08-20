@@ -1,6 +1,6 @@
-const APP_CACHE = "hanglyph-app-v1";
-const RUNTIME_CACHE = "hanglyph-runtime-v1";
-const SHELL = ["/", "/about", "/manifest.webmanifest", "/favicon.svg"];
+const APP_CACHE = "hanglyph-app-v2";
+const RUNTIME_CACHE = "hanglyph-runtime-v2";
+const SHELL = ["/", "/about", "/manifest.webmanifest", "/favicon.svg", "/index/pinyin.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(APP_CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -16,5 +16,5 @@ self.addEventListener("fetch", (event) => {
     const copy = response.clone();
     caches.open(RUNTIME_CACHE).then((cache) => cache.put(event.request, copy));
     return response;
-  }).catch(() => caches.match("/"))));
+  }).catch(() => event.request.mode === "navigate" ? caches.match("/") : Response.error())));
 });

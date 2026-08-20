@@ -1,9 +1,7 @@
-"use client";
-
-import Link from "next/link";
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import type { LocaleId, RegionalForms } from "../../src/lib/regional";
 
-type LocaleId = "cn" | "tw" | "hk" | "jp" | "sg" | "my";
 type FontStyle = "sans" | "serif";
 type Theme = "light" | "dark" | "system";
 
@@ -61,7 +59,7 @@ function getRecord(char: string): CharacterRecord {
   return { ...base, char, codePoint: char.codePointAt(0) ?? 0 };
 }
 
-function normalizeQuery(input: string): { chars: string[]; notice?: string } {
+function parseDirectQuery(input: string): { chars: string[]; notice?: string } {
   const query = input.trim();
   const unicodeMatch = query.match(/^U\+?([0-9A-F]{4,6})$/i);
   if (unicodeMatch) {
@@ -69,11 +67,19 @@ function normalizeQuery(input: string): { chars: string[]; notice?: string } {
     if (cp <= 0x10ffff) return { chars: [String.fromCodePoint(cp)] };
   }
   const reading = query.toLowerCase().replace(/[\s-]/g, "");
-  if (["gu", "gǔ", "骨"].includes(reading)) return { chars: ["骨"] };
   if (["hone", "ほね", "ホネ"].includes(reading)) return { chars: ["骨"] };
   const chars = Array.from(query).filter((char) => HAN_RE.test(char));
   if (chars.length) return { chars };
-  return { chars: [], notice: "暂未找到结果。试试“骨”、“gu”、“ほね”或“U+9AA8”。" };
+  return { chars: [], notice: "" };
+}
+
+function normalizePinyinInput(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[ǖǘǚǜü]/g, "v")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[1-5\s'’·-]/g, "");
 }
 
 function Glyph({ char, locale, style, size }: { char: string; locale: LocaleId; style: FontStyle; size: number }) {
@@ -87,6 +93,7 @@ function LocaleBadge({ locale }: { locale: LocaleId }) {
 }
 
 export default function HanGlyphApp({ initialCharacter = "骨" }: { initialCharacter?: string }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [chars, setChars] = useState(() => [initialCharacter]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -101,10 +108,35 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
   const [baseOpacity, setBaseOpacity] = useState(50);
   const [compareOpacity, setCompareOpacity] = useState(50);
   const [copied, setCopied] = useState(false);
+  const [regionalState, setRegionalState] = useState<{ source: string; forms: RegionalForms } | null>(null);
+  const [mandarinState, setMandarinState] = useState<{ source: string; readings: string[] } | null>(null);
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [searchLabel, setSearchLabel] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
   const selectedChar = chars[selectedIndex] ?? "骨";
   const record = useMemo(() => getRecord(selectedChar), [selectedChar]);
+  const regionalForms = regionalState?.source === selectedChar ? regionalState.forms : null;
+  const mandarinReadings = mandarinState?.source === selectedChar ? mandarinState.readings : [];
+
+  useEffect(() => {
+    let active = true;
+    const loadRegionalForms = window.setTimeout(() => {
+      Promise.all([
+        import("../../src/lib/regional"),
+        import("../../src/lib/pinyin"),
+      ]).then(([regional, readings]) => {
+        if (!active) return;
+        setRegionalState({ source: selectedChar, forms: regional.convertRegionalForms(selectedChar) });
+        setMandarinState({ source: selectedChar, readings: readings.getMandarinReadings(selectedChar) });
+      });
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(loadRegionalForms);
+    };
+  }, [selectedChar]);
 
   useEffect(() => {
     const restorePreferences = window.setTimeout(() => {
@@ -142,19 +174,53 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
     return () => window.removeEventListener("keydown", onKey);
   }, [fullscreenLocale, overlayOpen]);
 
-  function handleSearch(event: FormEvent) {
-    event.preventDefault();
-    const result = normalizeQuery(query);
-    if (!result.chars.length) {
-      setNotice(result.notice ?? "暂未找到结果");
-      return;
-    }
-    const unique = Array.from(new Set(result.chars));
+  function selectCharacters(nextChars: string[], message = "") {
+    const unique = Array.from(new Set(nextChars));
+    if (!unique.length) return;
     setChars(unique);
     setSelectedIndex(0);
-    setNotice(unique.length > 1 ? `已拆分为 ${unique.length} 个不重复汉字，点击下方字符即可逐字查看。` : "");
-    const next = `/char/${encodeURIComponent(unique[0])}`;
-    window.history.replaceState({}, "", next);
+    setSearchResults([]);
+    setSearchLabel("");
+    setNotice(message || (unique.length > 1 ? `已拆分为 ${unique.length} 个不重复汉字，点击下方字符即可逐字查看。` : ""));
+    navigate(`/char/${encodeURIComponent(unique[0])}`, { replace: true });
+  }
+
+  async function handleSearch(event: FormEvent) {
+    event.preventDefault();
+    const direct = parseDirectQuery(query);
+    if (direct.chars.length) {
+      selectCharacters(direct.chars, direct.notice);
+      return;
+    }
+
+    const normalized = normalizePinyinInput(query);
+    if (!/^[a-zv]+$/.test(normalized)) {
+      setSearchResults([]);
+      setNotice("暂未找到结果。可输入汉字、拼音、日语读音或 U+9AA8。 ");
+      return;
+    }
+
+    setSearchLoading(true);
+    setNotice("");
+    try {
+      const response = await fetch("/index/pinyin.json");
+      const data = await response.json() as { entries: Record<string, string> };
+      const exact = Array.from(data.entries[normalized] ?? "");
+      const prefixes = exact.length
+        ? []
+        : Object.entries(data.entries)
+            .filter(([syllable]) => syllable.startsWith(normalized))
+            .flatMap(([, charsForSyllable]) => Array.from(charsForSyllable));
+      const results = Array.from(new Set([...exact, ...prefixes])).slice(0, 60);
+      setSearchResults(results);
+      setSearchLabel(results.length ? `拼音 “${query.trim()}” 的候选字` : "");
+      setNotice(results.length ? `找到 ${results.length} 个候选字，选择一个查看地区写法。` : `没有找到“${query.trim()}”的拼音结果。`);
+    } catch {
+      setSearchResults([]);
+      setNotice("拼音索引暂时无法载入，请稍后再试。");
+    } finally {
+      setSearchLoading(false);
+    }
   }
 
   function stepSize(direction: -1 | 1) {
@@ -181,10 +247,10 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
   return (
     <div className="site-shell">
       <header className="topbar">
-        <Link href="/" className="wordmark" aria-label="字形首页"><span className="wordmark-mark">字</span> 字形</Link>
+        <a href="/" className="wordmark" aria-label="字形首页"><span className="wordmark-mark">字</span> 字形</a>
         <nav className="top-actions" aria-label="网站导航">
           <a href="#compare">比较</a>
-          <Link href="/about">关于</Link>
+          <a href="/about">关于</a>
           <button className="icon-button" onClick={() => setTheme(theme === "system" ? "light" : theme === "light" ? "dark" : "system")} aria-label={`主题：${theme}`} title={`主题：${theme}`}>
             {theme === "light" ? "☀" : theme === "dark" ? "☾" : "◐"}
           </button>
@@ -195,18 +261,26 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
         <section className="hero" aria-labelledby="hero-title">
           <p className="eyebrow">CJK 地区字形对照</p>
           <h1 id="hero-title">看见同一个字，<br /><span>在不同地区的样子。</span></h1>
-          <p className="hero-copy">输入汉字、词语、Unicode 或读音，立即比较大陆、台湾、香港与日本的实际字形。</p>
+          <p className="hero-copy">输入汉字、词语、Unicode 或拼音，先转换地区常用写法，再用大陆、台湾、香港与日本字体呈现实际字形。</p>
           <form className="search-form" onSubmit={handleSearch} role="search">
             <label className="sr-only" htmlFor="han-search">输入汉字、词语或读音</label>
             <span className="search-icon" aria-hidden="true">⌕</span>
-            <input id="han-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="试试：骨、发、gu、ほね、U+9AA8" autoComplete="off" />
-            <button type="submit">查看字形 <span aria-hidden="true">→</span></button>
+            <input id="han-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="试试：见、東、jian、dōng、U+898B" autoComplete="off" />
+            <button type="submit" disabled={searchLoading}>{searchLoading ? "搜索中" : "查看字形"} <span aria-hidden="true">→</span></button>
           </form>
           {notice && <p className="search-notice" role="status">{notice}</p>}
+          {searchResults.length > 0 && (
+            <div className="pinyin-results" aria-label={searchLabel}>
+              <div className="pinyin-results-heading"><strong>{searchLabel}</strong><span>最多显示 60 个</span></div>
+              <div className="pinyin-result-grid">
+                {searchResults.map((char) => <button key={char} onClick={() => selectCharacters([char])} aria-label={`查看${char}的地区写法`}>{char}</button>)}
+              </div>
+            </div>
+          )}
           <div className="quick-examples" aria-label="搜索示例">
             <span>快速示例</span>
-            {["骨", "发", "國", "龍", "歡迎來到東京"].map((example) => (
-              <button key={example} onClick={() => { setQuery(example); const result = normalizeQuery(example); setChars(Array.from(new Set(result.chars))); setSelectedIndex(0); setNotice(result.chars.length > 1 ? `已拆分为 ${Array.from(new Set(result.chars)).length} 个不重复汉字。` : ""); }}>{example}</button>
+            {["见", "東", "國", "龍", "歡迎來到東京"].map((example) => (
+              <button key={example} onClick={() => { setQuery(example); selectCharacters(parseDirectQuery(example).chars); }}>{example}</button>
             ))}
           </div>
         </section>
@@ -214,8 +288,8 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
         <section className="compare-section" id="compare" aria-labelledby="compare-title">
           <div className="section-heading">
             <div>
-              <p className="section-kicker">同一 Unicode 字符 · U+{record.codePoint.toString(16).toUpperCase()}</p>
-              <h2 id="compare-title">“{selectedChar}”的地区字形</h2>
+              <p className="section-kicker">地区常用写法 + 地区字体 · 输入 U+{record.codePoint.toString(16).toUpperCase()}</p>
+              <h2 id="compare-title">“{selectedChar}”的地区写法与字形</h2>
             </div>
             <button className="share-button" onClick={shareCharacter}>{copied ? "已复制链接" : "↗ 分享这个字"}</button>
           </div>
@@ -245,8 +319,8 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
             {(Object.keys(LOCALES) as LocaleId[]).map((locale) => (
               <button className="glyph-card" key={locale} onClick={() => setFullscreenLocale(locale)} aria-label={`全屏查看${LOCALES[locale].name}字形`}>
                 <div className="card-top"><LocaleBadge locale={locale} />{(locale === "sg" || locale === "my") && <span className="same-label">与大陆一致</span>}</div>
-                <div className="glyph-stage"><Glyph char={selectedChar} locale={locale} style={fontStyle} size={glyphSize} /></div>
-                <div className="card-bottom"><span>{fontStyle === "sans" ? "Source Han Sans" : "Source Han Serif"} · {LOCALES[locale].profile.toUpperCase()}</span><span aria-hidden="true">↗</span></div>
+                <div className="glyph-stage">{regionalForms ? <Glyph char={regionalForms[locale]} locale={locale} style={fontStyle} size={glyphSize} /> : <span className="glyph-loading" aria-label="正在转换地区写法">···</span>}</div>
+                <div className="card-bottom"><span>{regionalForms && regionalForms[locale] !== selectedChar ? `${selectedChar} → ${regionalForms[locale]} · ` : ""}{fontStyle === "sans" ? "Source Han Sans" : "Source Han Serif"} · {LOCALES[locale].profile.toUpperCase()}</span><span aria-hidden="true">↗</span></div>
               </button>
             ))}
           </div>
@@ -257,7 +331,7 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
             <p className="section-kicker">READINGS</p>
             <h3>读音</h3>
             <dl className="reading-list">
-              <div><dt>普通话</dt><dd>{record.mandarin?.join("、") || "暂无数据"}</dd></div>
+              <div><dt>普通话</dt><dd>{mandarinReadings.join("、") || record.mandarin?.join("、") || "暂无数据"}</dd></div>
               <div><dt>日本語 · 音</dt><dd>{record.japaneseOn?.join("、") || "—"}</dd></div>
               <div><dt>日本語 · 訓</dt><dd>{record.japaneseKun?.join("、") || "—"}</dd></div>
             </dl>
@@ -271,23 +345,23 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
           <article className="info-block explanation-block">
             <p className="section-kicker">WHY DIFFERENT?</p>
             <h3>为什么看起来不同？</h3>
-            <p>各地区的汉字字体规范可能采用不同的笔画形态或构件布局。因此，即使 Unicode 字符完全相同，实际显示的字形也可能不同。</p>
-            <details><summary>详细信息</summary><p>字符：{selectedChar} · U+{record.codePoint.toString(16).toUpperCase()} {record.radical ? `· 部首：${record.radical}` : ""} {record.strokes ? `· ${record.strokes} 画` : ""}<br />字体：Source Han / Noto CJK 地区字形配置<br />数据结构：Unicode Unihan 兼容字段</p></details>
+            <p>结果包含两层差异：先把输入转换为各地区常用字符，例如“见 → 見”“東 → 东”；再用对应地区字体展示相同字符可能存在的笔画与构件差异。</p>
+            <details><summary>详细信息</summary><p>输入字符：{selectedChar} · U+{record.codePoint.toString(16).toUpperCase()} {record.radical ? `· 部首：${record.radical}` : ""} {record.strokes ? `· ${record.strokes} 画` : ""}<br />地区用字：OpenCC 地区转换字典<br />字体：Source Han / Noto CJK 地区字形配置</p></details>
           </article>
         </section>
 
         <section className="method-section">
-          <div><p className="section-kicker">HOW IT WORKS</p><h2>不是换字，<br />而是换字形。</h2></div>
-          <div className="method-copy"><p>地区字形区域始终渲染同一个字符，只切换受控的地区字体配置。简繁、日文常用对应字等字符替换关系，另行展示。</p><p>新加坡与马来西亚在首版采用简体中文 CN 字形配置，不虚构独立字形标准。</p></div>
+          <div><p className="section-kicker">HOW IT WORKS</p><h2>先换地区写法，<br />再看字体字形。</h2></div>
+          <div className="method-copy"><p>第一层根据大陆、台湾、香港与日本的现代用字习惯转换字符；第二层再用对应地区的 Source Han 字体配置渲染。这样既能看到“见 / 見”“东 / 東”，也能观察同一字符的细微字形差异。</p><p>新加坡与马来西亚采用简体中文 CN 写法与字形配置。</p></div>
         </section>
       </main>
 
-      <footer><div className="footer-mark"><span className="wordmark-mark">字</span><div><strong>字形</strong><p>开源的 CJK 地区字形学习工具</p></div></div><div className="footer-links"><a href="https://github.com" target="_blank" rel="noreferrer">GitHub ↗</a><Link href="/about">资料来源</Link><span>不收集个人数据</span></div></footer>
+      <footer><div className="footer-mark"><span className="wordmark-mark">字</span><div><strong>字形</strong><p>开源的 CJK 地区字形学习工具</p></div></div><div className="footer-links"><a href="https://github.com/AceYKN/hanzi-regional-glyphs" target="_blank" rel="noreferrer">GitHub ↗</a><a href="/about">资料来源</a><span>不收集个人数据</span></div></footer>
 
       {fullscreenLocale && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`${LOCALES[fullscreenLocale].name}字形全屏查看`}>
           <button ref={modalCloseRef} className="modal-close" onClick={() => setFullscreenLocale(null)} aria-label="关闭全屏">×</button>
-          <div className="fullscreen-card"><LocaleBadge locale={fullscreenLocale} /><Glyph char={selectedChar} locale={fullscreenLocale} style={fontStyle} size={256} /><p>{fontStyle === "sans" ? "Source Han Sans" : "Source Han Serif"} · {LOCALES[fullscreenLocale].profile.toUpperCase()}</p></div>
+          <div className="fullscreen-card"><LocaleBadge locale={fullscreenLocale} />{regionalForms && <Glyph char={regionalForms[fullscreenLocale]} locale={fullscreenLocale} style={fontStyle} size={256} />}<p>{regionalForms && regionalForms[fullscreenLocale] !== selectedChar ? `${selectedChar} → ${regionalForms[fullscreenLocale]} · ` : ""}{fontStyle === "sans" ? "Source Han Sans" : "Source Han Serif"} · {LOCALES[fullscreenLocale].profile.toUpperCase()}</p></div>
         </div>
       )}
 
@@ -297,8 +371,8 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
           <div className="overlay-panel">
             <div className="overlay-heading"><p className="section-kicker">OVERLAY</p><h2>叠加比较“{selectedChar}”</h2><p>两个地区字形共享同一坐标，可用透明度观察细微差异。</p></div>
             <div className="overlay-stage" aria-label={`${LOCALES[overlayBase].name}和${LOCALES[overlayCompare].name}的叠加字形`}>
-              <span className={`glyph glyph-han-${LOCALES[overlayBase].profile}-${fontStyle} overlay-one`} style={{ opacity: baseOpacity / 100 }}>{selectedChar}</span>
-              <span className={`glyph glyph-han-${LOCALES[overlayCompare].profile}-${fontStyle} overlay-two`} style={{ opacity: compareOpacity / 100 }}>{selectedChar}</span>
+              <span className={`glyph glyph-han-${LOCALES[overlayBase].profile}-${fontStyle} overlay-one`} style={{ opacity: baseOpacity / 100 }}>{regionalForms?.[overlayBase] ?? selectedChar}</span>
+              <span className={`glyph glyph-han-${LOCALES[overlayCompare].profile}-${fontStyle} overlay-two`} style={{ opacity: compareOpacity / 100 }}>{regionalForms?.[overlayCompare] ?? selectedChar}</span>
             </div>
             <div className="overlay-controls">
               <div><span><select aria-label="基础地区" value={overlayBase} onChange={(event) => setOverlayBase(event.target.value as LocaleId)}>{(Object.keys(LOCALES) as LocaleId[]).map((id) => <option key={id} value={id}>{LOCALES[id].flag} {LOCALES[id].name}</option>)}</select><output>{baseOpacity}%</output></span><input aria-label={`${LOCALES[overlayBase].name}透明度`} type="range" min="0" max="100" value={baseOpacity} onChange={(event) => setBaseOpacity(Number(event.target.value))} /></div>

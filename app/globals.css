@@ -75,8 +75,16 @@ main { width: min(1440px, calc(100% - 64px)); margin: 0 auto; }
 .search-form input { min-width: 0; flex: 1; height: 50px; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 15px; }
 .search-form input::placeholder { color: var(--faint); }
 .search-form button { align-self: stretch; padding: 0 23px; border: 0; border-radius: 2px; color: #f7faf8; background: #184c3f; font-size: 13px; cursor: pointer; }
+.search-form button:disabled { opacity: .65; cursor: wait; }
 .search-form button span { margin-left: 8px; }
 .search-notice { margin: 14px 0 -8px; color: var(--muted); font-size: 13px; }
+.pinyin-results { width: min(780px, 100%); margin-top: 22px; padding: 20px; background: var(--surface-strong); border: 1px solid var(--line); text-align: left; }
+.pinyin-results-heading { margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+.pinyin-results-heading strong { font-size: 13px; font-weight: 600; }
+.pinyin-results-heading span { color: var(--faint); font-size: 10px; }
+.pinyin-result-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
+.pinyin-result-grid button { aspect-ratio: 1; border: 1px solid var(--line); background: var(--surface); font-family: "Noto Serif SC", serif; font-size: 20px; cursor: pointer; }
+.pinyin-result-grid button:hover { color: var(--surface-strong); background: var(--accent); border-color: var(--accent); }
 .quick-examples { margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; color: var(--faint); font-size: 11px; }
 .quick-examples span { margin-right: 5px; letter-spacing: .08em; }
 .quick-examples button { padding: 5px 10px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--muted); cursor: pointer; }
@@ -110,6 +118,7 @@ main { width: min(1440px, calc(100% - 64px)); margin: 0 auto; }
 .locale-badge { font-size: 13px; font-weight: 600; }
 .same-label { color: var(--faint); font-size: 9px; letter-spacing: .04em; }
 .glyph-stage { min-height: 0; flex: 1; display: grid; place-items: center; overflow: hidden; }
+.glyph-loading { color: var(--faint); font-size: 24px; letter-spacing: .2em; }
 .glyph { display: inline-block; line-height: 1; font-weight: 400; }
 .glyph-han-cn-sans { font-family: "Noto Sans SC", sans-serif; }
 .glyph-han-tw-sans { font-family: "Noto Sans TC", sans-serif; }
@@ -189,6 +198,9 @@ footer { width: min(1440px, calc(100% - 64px)); min-height: 150px; margin: 0 aut
   .search-form button { width: 55px; padding: 0; font-size: 0; }
   .search-form button span { margin: 0; font-size: 20px; }
   .quick-examples span { width: 100%; }
+  .pinyin-results { padding: 15px; }
+  .pinyin-result-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .pinyin-result-grid button { font-size: 18px; }
   .compare-section { padding: 62px 0 80px; }
   .section-heading { align-items: start; }
   .section-heading h2 { font-size: 34px; }
