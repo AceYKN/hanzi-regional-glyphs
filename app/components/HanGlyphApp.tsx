@@ -18,7 +18,7 @@ interface CharacterRecord {
 }
 
 const LOCALES: Record<LocaleId, { flag: string; name: string; profile: "cn" | "tw" | "hk" | "jp" }> = {
-  cn: { flag: "🇨🇳", name: "大陆", profile: "cn" },
+  cn: { flag: "🇨🇳", name: "中国", profile: "cn" },
   tw: { flag: "🇹🇼", name: "台湾", profile: "tw" },
   hk: { flag: "🇭🇰", name: "香港", profile: "hk" },
   jp: { flag: "🇯🇵", name: "日本", profile: "jp" },
@@ -261,7 +261,7 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
         <section className="hero" aria-labelledby="hero-title">
           <p className="eyebrow">CJK 地区字形对照</p>
           <h1 id="hero-title">看见同一个字，<br /><span>在不同地区的样子。</span></h1>
-          <p className="hero-copy">输入汉字、词语、Unicode 或拼音，先转换地区常用写法，再用大陆、台湾、香港与日本字体呈现实际字形。</p>
+          <p className="hero-copy">输入汉字、词语、Unicode 或拼音，先转换地区常用写法，再用中国、台湾、香港与日本字体呈现实际字形。</p>
           <form className="search-form" onSubmit={handleSearch} role="search">
             <label className="sr-only" htmlFor="han-search">输入汉字、词语或读音</label>
             <span className="search-icon" aria-hidden="true">⌕</span>
@@ -318,7 +318,7 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
           <div className="glyph-grid">
             {(Object.keys(LOCALES) as LocaleId[]).map((locale) => (
               <button className="glyph-card" key={locale} onClick={() => setFullscreenLocale(locale)} aria-label={`全屏查看${LOCALES[locale].name}字形`}>
-                <div className="card-top"><LocaleBadge locale={locale} />{(locale === "sg" || locale === "my") && <span className="same-label">与大陆一致</span>}</div>
+                <div className="card-top"><LocaleBadge locale={locale} />{(locale === "sg" || locale === "my") && <span className="same-label">与中国一致</span>}</div>
                 <div className="glyph-stage">{regionalForms ? <Glyph char={regionalForms[locale]} locale={locale} style={fontStyle} size={glyphSize} /> : <span className="glyph-loading" aria-label="正在转换地区写法">···</span>}</div>
                 <div className="card-bottom"><span>{regionalForms && regionalForms[locale] !== selectedChar ? `${selectedChar} → ${regionalForms[locale]} · ` : ""}{fontStyle === "sans" ? "Source Han Sans" : "Source Han Serif"} · {LOCALES[locale].profile.toUpperCase()}</span><span aria-hidden="true">↗</span></div>
               </button>
@@ -352,7 +352,7 @@ export default function HanGlyphApp({ initialCharacter = "骨" }: { initialChara
 
         <section className="method-section">
           <div><p className="section-kicker">HOW IT WORKS</p><h2>先换地区写法，<br />再看字体字形。</h2></div>
-          <div className="method-copy"><p>第一层根据大陆、台湾、香港与日本的现代用字习惯转换字符；第二层再用对应地区的 Source Han 字体配置渲染。这样既能看到“见 / 見”“东 / 東”，也能观察同一字符的细微字形差异。</p><p>新加坡与马来西亚采用简体中文 CN 写法与字形配置。</p></div>
+          <div className="method-copy"><p>第一层根据中国、台湾、香港与日本的现代用字习惯转换字符；第二层再用对应地区的 Source Han 字体配置渲染。这样既能看到“见 / 見”“东 / 東”，也能观察同一字符的细微字形差异。</p><p>新加坡与马来西亚采用简体中文 CN 写法与字形配置。</p></div>
         </section>
       </main>
 
