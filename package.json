@@ -6,6 +6,7 @@
     "type": "git",
     "url": "https://github.com/AceYKN/hanzi-regional-glyphs.git"
   },
+  "homepage": "https://hanzi-regional-glyphs.pages.dev/",
   "engines": {
     "node": ">=22.13.0"
   },

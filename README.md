@@ -2,6 +2,8 @@
 
 输入一个汉字，立即比较它在中国大陆、台湾、香港、日本、新加坡和马来西亚的地区写法与实际字形。
 
+在线体验：[hanzi-regional-glyphs.pages.dev](https://hanzi-regional-glyphs.pages.dev/)
+
 ## 功能
 
 - 地区用字转换：`见 → 見`、`東 → 东`、`國 → 国`、`龍 → 竜`
