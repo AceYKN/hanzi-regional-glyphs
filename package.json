@@ -12,18 +12,20 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run data:build && tsc --noEmit && vite build",
+    "build": "npm run data:build && tsc --noEmit && vite build && node scripts/build-service-worker.mjs",
     "preview": "vite preview",
-    "test": "node --test tests/rendered-html.test.mjs",
+    "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist",
-    "data:build": "node scripts/build-pinyin-index.mjs"
+    "data:build": "tsx scripts/build-readings.ts",
+    "data:unihan": "python scripts/build-unihan.py",
+    "data:fonts": "python scripts/build-fonts.py"
   },
   "dependencies": {
-    "opencc-js": "^1.4.1",
-    "pinyin-pro": "^3.29.3",
+    "opencc-js": "1.4.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "wanakana": "5.3.1"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
@@ -38,10 +40,11 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "16.4.0",
     "tailwindcss": "4.2.1",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "typescript-eslint": "8.59.3",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "vite": "8.3.4",
+    "wrangler": "4.150.0"
   },
   "type": "module"
 }

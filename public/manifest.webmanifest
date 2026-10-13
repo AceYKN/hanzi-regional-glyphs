@@ -1,7 +1,7 @@
 {
   "name": "字形 — 汉字地区字形对照",
   "short_name": "字形",
-  "description": "输入一个汉字，立即比较不同地区的实际字形。",
+  "description": "查询汉字、读音和对应写法，比较四套地区字体字形。",
   "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",
