@@ -19,4 +19,3 @@ async page => {
  await r.getByRole("textbox").fill("gu3");await r.getByRole("button",{name:"查询",exact:true}).click();await r.getByRole("button",{name:"令",exact:true}).click();await r.waitForTimeout(1000);
  check((await r.locator("#compare-title").innerText()).startsWith("令"),"Late query replaced selection");check(await r.locator(".candidate-grid").count()===0,"Late candidates resurfaced");check(!await r.getByRole("button",{name:"查询",exact:true}).isDisabled(),"Loading never cleared");results.push("late search response cannot overwrite newer direct selection");await race.close();return results;
 }
-
